@@ -253,9 +253,12 @@ class ConnectionDescriptor: public EventableDescriptor
 		void _UpdateEvents(bool, bool);
 		void _WriteOutboundData();
 		void _DispatchInboundData (const char *buffer, int size);
-		void _DispatchCiphertext();
+		//void _DispatchCiphertext();
 		int _SendRawOutboundData (const char*, int);
 		void _CheckHandshakeStatus();
+
+	public:
+		void _DispatchCiphertext();
 
 };
 

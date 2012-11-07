@@ -599,8 +599,12 @@ int ConnectionDescriptor::_SendRawOutboundData (const char *data, int length)
 	// and not the whole process), and no coalescing of small pages.
 	// (Well, not so bad, small pages are coalesced in ::Write)
 
-	if (IsCloseScheduled())
+	// XXX: Short circuiting here breaks SSL close_notify handshaking! This may
+	// need more tweaking, but for now this change should be sufficient to get
+	// our close_notify ciphertext through the pipeline.
+	if (IsCloseScheduled() && !SslBox){
 		return 0;
+	}
 
 	// 25Mar10: Ignore 0 length packets as they are not meaningful in TCP (as opposed to UDP)
 	// and can cause the assert(nbytes>0) to fail when OutboundPages has a bunch of 0 length pages.

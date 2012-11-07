@@ -259,12 +259,61 @@ SslBox_t::~SslBox_t
 
 SslBox_t::~SslBox_t()
 {
+	int s_status,rval,eval;
+
+	// Magic us up the connection descriptor for reference.
+	ConnectionDescriptor *cd =  dynamic_cast <ConnectionDescriptor*> (Bindable_t::GetObject ((unsigned long) SSL_get_ex_data(pSSL, 0)));
+
 	// Freeing pSSL will also free the associated BIOs, so DON'T free them separately.
 	if (pSSL) {
-		if (SSL_get_shutdown (pSSL) & SSL_RECEIVED_SHUTDOWN)
-			SSL_shutdown (pSSL);
-		else
+		s_status = SSL_get_shutdown(pSSL);
+		if (s_status != 3){
+			rval = SSL_shutdown (pSSL);
+			if (rval >= 0){
+				switch(SSL_get_shutdown(pSSL)){
+					case 0:
+						break;
+					case SSL_SENT_SHUTDOWN:
+						// Try calling SSL_shutdown again.
+						rval = SSL_shutdown(pSSL);
+						if(rval < 0){
+							eval = SSL_get_error(pSSL, rval);
+							switch(eval){
+								case SSL_ERROR_WANT_READ:
+									// TODO: We need to tell eventmachine to shuffle more data
+									// from the socket into the SSL subsystem. We may need to
+									// write data (our own buffered close_notify alert) before
+									// a close notify from the other party should be expected.
+
+									cd->_DispatchCiphertext();
+									cd->Write();
+									cd->Read();
+
+									rval = SSL_shutdown(pSSL);
+									if(rval < 0){
+										// Technically this means we probably haven't received the
+										// close_notify from our peer.
+									}
+
+									break;
+								case SSL_ERROR_WANT_WRITE:
+									break;
+								default:
+									break;
+							}
+						}
+						break;
+					case SSL_RECEIVED_SHUTDOWN:
+						break;
+					case SSL_SENT_SHUTDOWN|SSL_RECEIVED_SHUTDOWN:
+						break;
+					default:
+						break;
+				}
+			}
+		} else {
 			SSL_clear (pSSL);
+		}
 		SSL_free (pSSL);
 	}
 
